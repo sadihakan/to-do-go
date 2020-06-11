@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/jmoiron/sqlx"
+ 	"github.com/go-playground/validator"
 )
 
 type ToDo struct {
@@ -26,6 +27,7 @@ const (
 )
 
 var db *sqlx.DB
+var validate *validator.Validate
 
 func main() {
 	connectToDatabase()
@@ -50,8 +52,13 @@ func getTodosWithID(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusOK, "Can't find id:" + param)
 	}
-	todo := getTodoFromDB(id)
-	return c.JSON(http.StatusOK, todo)
+	todo, isDone := getTodoFromDB(id)
+	if isDone {
+		return c.JSON(http.StatusOK, todo)
+	} else {
+		return c.String(http.StatusOK, "User not exist")
+	}
+
 }
 
 func postTodo(c echo.Context) error {
@@ -116,7 +123,7 @@ func getTodosFromDB() []ToDo {
 	return todos
 }
 
-func getTodoFromDB(id int) ToDo {
+func getTodoFromDB(id int) (ToDo, bool) {
 	fmt.Println(id)
 	//Neden $1 şeklinde $0 değil ???
 	rows, err := db.Queryx("SELECT * FROM todos WHERE id = $1", id)
@@ -137,7 +144,17 @@ func getTodoFromDB(id int) ToDo {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return todos[0]
+
+	validateErr := validate.Struct(todos)
+	if validateErr != nil {
+		return ToDo{
+			ID:          0,
+			Description: "",
+			IsDone:      false,
+		}, false
+
+	}
+	return todos[0], true
 }
 
 func insertTodoToDB(description string) {

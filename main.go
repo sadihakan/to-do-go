@@ -3,19 +3,20 @@ package main
 import (
 	"fmt"
 	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
 	"log"
 	"net/http"
 	"strconv"
 
-	_ "github.com/lib/pq"
+	"github.com/go-playground/validator"
 	"github.com/jmoiron/sqlx"
- 	"github.com/go-playground/validator"
+	_ "github.com/lib/pq"
 )
 
 type ToDo struct {
-	ID int `db:"id"`
+	ID          int    `db:"id"`
 	Description string `db:"description"`
-	IsDone bool `db:"is_done"`
+	IsDone      bool   `db:"is_done"`
 }
 
 const (
@@ -33,12 +34,19 @@ func main() {
 	connectToDatabase()
 
 	e := echo.New()
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		Skipper:      middleware.DefaultSkipper,
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
+	}))
 	e.GET("/", getTodos)
 	e.GET("/:id", getTodosWithID)
 	e.POST("/", postTodo)
 	e.PATCH("/:id", patchTodo)
 	e.DELETE("/:id", deleteTodo)
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Logger.Fatal(e.Start(":8081"))
 }
 
 func getTodos(c echo.Context) error {
@@ -50,7 +58,7 @@ func getTodosWithID(c echo.Context) error {
 	param := c.Param("id")
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.String(http.StatusOK, "Can't find id:" + param)
+		return c.String(http.StatusOK, "Can't find id:"+param)
 	}
 	todo, isDone := getTodoFromDB(id)
 	if isDone {
@@ -72,10 +80,10 @@ func patchTodo(c echo.Context) error {
 	isDone := c.FormValue("isDone")
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.String(http.StatusOK, "Can't find id:" + param)
+		return c.String(http.StatusOK, "Can't find id:"+param)
 	}
 	isDoneBool, err := strconv.ParseBool(isDone)
-	patchTodoDB(id,isDoneBool)
+	patchTodoDB(id, isDoneBool)
 	return c.String(http.StatusOK, "Done")
 }
 
@@ -83,7 +91,7 @@ func deleteTodo(c echo.Context) error {
 	param := c.Param("id")
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.String(http.StatusOK, "Can't find id:" + param)
+		return c.String(http.StatusOK, "Can't find id:"+param)
 	}
 	deleteTodoDB(id)
 	return c.String(http.StatusOK, "Done")
@@ -125,7 +133,6 @@ func getTodosFromDB() []ToDo {
 
 func getTodoFromDB(id int) (ToDo, bool) {
 	fmt.Println(id)
-	//Neden $1 şeklinde $0 değil ???
 	rows, err := db.Queryx("SELECT * FROM todos WHERE id = $1", id)
 	if err != nil {
 		panic(err)
@@ -174,4 +181,3 @@ func deleteTodoDB(id int) {
 	tx.MustExec("DELETE FROM todos WHERE id = $1;", id)
 	tx.Commit()
 }
-

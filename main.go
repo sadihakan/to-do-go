@@ -14,9 +14,23 @@ import (
 )
 
 type ToDo struct {
-	ID          int    `db:"id"`
-	Description string `db:"description"`
-	IsDone      bool   `db:"is_done"`
+	ID          int64  `db:"id" json:"id"`
+	Description string `db:"description" json:"description"`
+	IsDone      bool   `db:"is_done" json:"is_done"`
+}
+
+type Response struct {
+	Data       interface{} `json:"data"`
+	TotalCount int64       `json:"total_count"`
+	Status     bool        `json:"status"`
+}
+
+type PostTodo struct {
+	Description string `json:"description" form:"description"`
+}
+
+type RequestMessage struct {
+	Message string `json:"message"`
 }
 
 const (
@@ -50,41 +64,59 @@ func main() {
 }
 
 func getTodos(c echo.Context) error {
+	response := new(Response)
 	todos := getTodosFromDB()
-	return c.JSON(http.StatusOK, todos)
+	response.Data = todos
+	response.TotalCount = int64(len(todos))
+	return c.JSON(http.StatusOK, response)
 }
 
 func getTodosWithID(c echo.Context) error {
 	param := c.Param("id")
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.String(http.StatusOK, "Can't find id:"+param)
+		message := new(RequestMessage)
+		message.Message = "Can't find id:"+param
+		return c.JSON(http.StatusBadRequest, message)
 	}
 	todo, isDone := getTodoFromDB(id)
 	if isDone {
 		return c.JSON(http.StatusOK, todo)
 	} else {
-		return c.String(http.StatusOK, "User not exist")
+		message := new(RequestMessage)
+		message.Message = "User not exist"
+		return c.JSON(http.StatusBadRequest, message)
 	}
-
 }
 
-func postTodo(c echo.Context) error {
-	description := c.FormValue("description")
-	insertTodoToDB(description)
-	return c.String(http.StatusOK, "Done")
-}
-
-func patchTodo(c echo.Context) error {
-	param := c.Param("id")
-	isDone := c.FormValue("isDone")
-	id, err := strconv.Atoi(c.Param("id"))
+func postTodo(c echo.Context) (err error) {
+	response := new(Response)
+	body := new(PostTodo)
+	todo := new(ToDo)
+	if err = c.Bind(body); err != nil {
+		return
+	}
+	todo.Description = body.Description
+	err = insertTodoToDB(todo)
 	if err != nil {
-		return c.String(http.StatusOK, "Can't find id:"+param)
+		message := new(RequestMessage)
+		message.Message = err.Error()
+		return c.JSON(http.StatusBadRequest, message)
 	}
-	isDoneBool, err := strconv.ParseBool(isDone)
-	patchTodoDB(id, isDoneBool)
-	return c.String(http.StatusOK, "Done")
+	response.Data = todo
+	response.Status = true
+	return c.JSON(http.StatusCreated, response)
+}
+
+func patchTodo(c echo.Context) (err error) {
+	body := new(ToDo)
+	if err = c.Bind(body); err != nil {
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	body.ID = int64(id)
+	patchTodoDB(body)
+	return c.JSON(http.StatusOK, body)
 }
 
 func deleteTodo(c echo.Context) error {
@@ -94,7 +126,9 @@ func deleteTodo(c echo.Context) error {
 		return c.String(http.StatusOK, "Can't find id:"+param)
 	}
 	deleteTodoDB(id)
-	return c.String(http.StatusOK, "Done")
+	message := new(RequestMessage)
+	message.Message = "Todo deleted"
+	return c.JSON(http.StatusBadRequest, message)
 }
 
 func connectToDatabase() {
@@ -164,16 +198,33 @@ func getTodoFromDB(id int) (ToDo, bool) {
 	return todos[0], true
 }
 
-func insertTodoToDB(description string) {
-	tx := db.MustBegin()
-	tx.MustExec("INSERT INTO todos (description) VALUES ($1)", description)
-	tx.Commit()
+func insertTodoToDB(todo *ToDo) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	err = tx.QueryRowx("INSERT INTO todos (description) VALUES ($1) RETURNING id", todo.Description).Scan(&todo.ID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
-func patchTodoDB(id int, isDone bool) {
-	tx := db.MustBegin()
-	tx.MustExec("UPDATE todos SET is_done = $1 WHERE id = $2", isDone, id)
-	tx.Commit()
+func patchTodoDB(todo *ToDo) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	log.Println(todo)
+	err = tx.QueryRowx("UPDATE todos SET is_done = $1 WHERE id = $2 RETURNING *", todo.IsDone, todo.ID).Scan(&todo.ID,&todo.IsDone,&todo.Description)
+	if err != nil {
+		log.Fatal(err)
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 func deleteTodoDB(id int) {

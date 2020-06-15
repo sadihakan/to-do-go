@@ -120,15 +120,16 @@ func patchTodo(c echo.Context) (err error) {
 }
 
 func deleteTodo(c echo.Context) error {
-	param := c.Param("id")
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.String(http.StatusOK, "Can't find id:"+param)
+		message := new(RequestMessage)
+		message.Message = err.Error()
+		return c.JSON(http.StatusBadRequest, message)
 	}
 	deleteTodoDB(id)
 	message := new(RequestMessage)
 	message.Message = "Todo deleted"
-	return c.JSON(http.StatusBadRequest, message)
+	return c.JSON(http.StatusNoContent, nil)
 }
 
 func connectToDatabase() {

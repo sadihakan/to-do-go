@@ -9,13 +9,11 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"github.com/unrolled/render"
 )
 
 type Handler struct {
 	App *App
 	Echo *echo.Echo
-	Render *render.Render
 	Chi *chi.Mux
 }
 
@@ -26,7 +24,6 @@ func NewHandler(app *App) *Handler {
 	c := chi.NewRouter()
 
 	h.App = app
-	h.Render = render.New()
 
 	c.Use(middleware.RequestID)
 	c.Use(middleware.RealIP)
@@ -53,12 +50,18 @@ func NewHandler(app *App) *Handler {
 }
 //HTTP
 
+func (h *Handler) renderJSON(w http.ResponseWriter, statusCode int, response interface{}) {
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(response)
+}
+
 func (h *Handler) getTodosByChi(w http.ResponseWriter, r *http.Request) {
 	response := new(model.Response)
 	todos := h.getTodosFromDB()
 	response.Data = todos
 	response.TotalCount = int64(len(todos))
-	h.Render.JSON(w, http.StatusOK, response)
+	h.renderJSON(w,http.StatusOK, response)
 }
 
 func (h *Handler) getTodos(c echo.Context) error {
@@ -74,14 +77,14 @@ func (h *Handler) getTodosWithIDByChi(w http.ResponseWriter, r *http.Request) {
 	if query != "" {
 		id, err := strconv.ParseInt(query, 10,64)
 		if err != nil {
-			h.Render.JSON(w, http.StatusBadRequest, nil)
+			h.renderJSON(w, http.StatusBadRequest, nil)
 		}
 		todo, err := h.getTodoFromDB(id)
 		if err != nil {
-			h.Render.JSON(w, http.StatusBadRequest, nil)
+			h.renderJSON(w, http.StatusBadRequest, nil)
 		}
 
-		h.Render.JSON(w, http.StatusOK, model.Response{
+		h.renderJSON(w, http.StatusOK, model.Response{
 			Data: todo,
 		})
 	}
@@ -107,11 +110,11 @@ func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 	todo := new(model.Todo)
 	err := json.NewDecoder(r.Body).Decode(&todo)
 	if err != nil {
-		h.Render.JSON(w, http.StatusBadRequest, nil)
+		h.renderJSON(w, http.StatusBadRequest, nil)
 	}
 
 	if err = h.App.Validator.Struct(todo); err != nil {
-		h.Render.JSON(w, http.StatusUnprocessableEntity, model.Response{
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
 			Errors: err.Error(),
 			Detail: http.StatusText(http.StatusUnprocessableEntity),
 		})
@@ -119,14 +122,14 @@ func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 
 	err = h.insertTodoToDB(todo)
 	if err != nil {
-		h.Render.JSON(w, http.StatusUnprocessableEntity, model.Response{
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
 			Errors: err.Error(),
 			Detail: http.StatusText(http.StatusUnprocessableEntity),
 		})
 	}
 
 	response.Data = todo
-	h.Render.JSON(w, http.StatusCreated, response)
+	h.renderJSON(w, http.StatusCreated, response)
 }
 
 func (h *Handler) postTodo(c echo.Context) (err error) {
@@ -159,7 +162,7 @@ func (h *Handler) patchTodoByChi(w http.ResponseWriter, r *http.Request) {
 	todo := model.NewTodo()
 	err := json.NewDecoder(r.Body).Decode(&todo)
 	if err != nil {
-		h.Render.JSON(w, http.StatusUnprocessableEntity, model.Response{
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
 			Errors: err.Error(),
 			Detail: http.StatusText(http.StatusUnprocessableEntity),
 		})
@@ -168,7 +171,7 @@ func (h *Handler) patchTodoByChi(w http.ResponseWriter, r *http.Request) {
 	query := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(query, 10,64)
 	if err != nil {
-		h.Render.JSON(w, http.StatusUnprocessableEntity, model.Response{
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
 			Errors: err.Error(),
 			Detail: http.StatusText(http.StatusUnprocessableEntity),
 		})
@@ -176,7 +179,7 @@ func (h *Handler) patchTodoByChi(w http.ResponseWriter, r *http.Request) {
 
 	todo.ID = id
 	h.patchTodoDB(todo.ID, todo)
-	h.Render.JSON(w, http.StatusOK, todo)
+	h.renderJSON(w, http.StatusOK, todo)
 }
 
 func (h *Handler) patchTodo(c echo.Context) (err error) {
@@ -200,7 +203,7 @@ func (h *Handler) deleteTodoByChi(w http.ResponseWriter, r *http.Request) {
 	query := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(query, 10,64)
 	if err != nil {
-		h.Render.JSON(w, http.StatusUnprocessableEntity, model.Response{
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
 			Errors: err.Error(),
 			Detail: http.StatusText(http.StatusUnprocessableEntity),
 		})
@@ -208,12 +211,12 @@ func (h *Handler) deleteTodoByChi(w http.ResponseWriter, r *http.Request) {
 
 	err = h.deleteTodoDB(id)
 	if err != nil {
-		h.Render.JSON(w, http.StatusNotFound, model.Response{
+		h.renderJSON(w, http.StatusNotFound, model.Response{
 			Detail: http.StatusText(http.StatusNotFound),
 		})
 	}
 
-	h.Render.JSON(w, http.StatusNoContent, nil)
+	h.renderJSON(w, http.StatusNoContent, nil)
 }
 
 func (h *Handler) deleteTodo(c echo.Context) error {

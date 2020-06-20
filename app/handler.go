@@ -77,7 +77,7 @@ func FileServer(router *chi.Mux) {
 
 func (h *Handler) getImagePath(r *http.Request) (string, error) {
 	r.ParseMultipartForm(10 << 20)
-	file, handler, err := r.FormFile("imageURL")
+	file, handler, err := r.FormFile("image_url")
 	if err != nil {
 		fmt.Println("Error Retrieving the File")
 		fmt.Println(err)
@@ -165,9 +165,14 @@ func (h *Handler) getTodosWithID(c echo.Context) error {
 func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 	response := new(model.Response)
 	todo := new(model.Todo)
+	fmt.Println(r.Body)
 	err := json.NewDecoder(r.Body).Decode(&todo)
 	if err != nil {
-		h.renderJSON(w, http.StatusBadRequest, nil)
+		h.renderJSON(w, http.StatusBadRequest, model.Response{
+			Errors: err.Error(),
+			Detail: http.StatusText(http.StatusBadRequest),
+		})
+		return
 	}
 
 	if err = h.App.Validator.Struct(todo); err != nil {
@@ -175,6 +180,7 @@ func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 			Errors: err.Error(),
 			Detail: http.StatusText(http.StatusUnprocessableEntity),
 		})
+		return
 	}
 
 	filePath, err := h.getImagePath(r)
@@ -183,6 +189,7 @@ func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 			Errors: err.Error(),
 			Detail: http.StatusText(http.StatusUnprocessableEntity),
 		})
+		return
 	}
 	fmt.Printf("File url: %+v\n", filePath)
 	todo.ImageURL = filePath

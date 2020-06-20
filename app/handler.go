@@ -3,11 +3,14 @@ package app
 import (
 	"ToDoGo/model"
 	"encoding/json"
+	"fmt"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/labstack/echo"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 )
 
@@ -16,7 +19,6 @@ type Handler struct {
 	Echo *echo.Echo
 	Chi *chi.Mux
 }
-
 
 func NewHandler(app *App) *Handler {
 	h := new(Handler)
@@ -38,6 +40,8 @@ func NewHandler(app *App) *Handler {
 		r.Delete("/{id}", h.deleteTodoByChi)
 	})
 
+	FileServer(c)
+
 	e.GET("/", h.getTodos)
 	e.GET("/:id", h.getTodosWithID)
 	e.POST("/", h.postTodo)
@@ -49,6 +53,52 @@ func NewHandler(app *App) *Handler {
 	return h
 }
 //HTTP
+
+func FileServer(router *chi.Mux) {
+	root := "./src"
+	fs := http.FileServer(http.Dir(root))
+
+	router.Get("/images/*", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println(r.RequestURI)
+		if _, err := os.Stat(root + r.RequestURI); os.IsNotExist(err) {
+			http.StripPrefix(r.RequestURI, fs).ServeHTTP(w, r)
+		} else {
+			fs.ServeHTTP(w, r)
+		}
+	})
+}
+
+func (h *Handler) getImagePath(r *http.Request) (string, error) {
+	r.ParseMultipartForm(10 << 20)
+	file, handler, err := r.FormFile("image")
+	if err != nil {
+		fmt.Println("Error Retrieving the File")
+		fmt.Println(err)
+		return "", err
+	}
+	defer file.Close()
+	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
+	fmt.Printf("File Size: %+v\n", handler.Size)
+	fmt.Printf("MIME Header: %+v\n", handler.Header)
+
+	tempFile, err := ioutil.TempFile("./src/images", "todo-*.jpg")
+	if err != nil {
+		return "", err
+	}
+	defer tempFile.Close()
+
+	fileBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = tempFile.Write(fileBytes)
+	if err != nil {
+		return "", err
+	}
+
+	return tempFile.Name(), nil
+}
 
 func (h *Handler) renderJSON(w http.ResponseWriter, statusCode int, response interface{}) {
 	w.Header().Add("Content-Type", "application/json")

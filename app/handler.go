@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -60,7 +61,8 @@ func FileServer(router *chi.Mux) {
 		log.Fatal(err)
 	}
 
-	root := dir + "/src"
+	filepath.Join(dir, "/src")
+	root := dir
 	fs := http.FileServer(http.Dir(root))
 
 	router.Get("/files/*", func(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +77,7 @@ func FileServer(router *chi.Mux) {
 
 func (h *Handler) getImagePath(r *http.Request) (string, error) {
 	r.ParseMultipartForm(10 << 20)
-	file, handler, err := r.FormFile("image")
+	file, handler, err := r.FormFile("imageURL")
 	if err != nil {
 		fmt.Println("Error Retrieving the File")
 		fmt.Println(err)
@@ -175,6 +177,16 @@ func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	filePath, err := h.getImagePath(r)
+	if err != nil {
+		h.renderJSON(w, http.StatusBadRequest, model.Response{
+			Errors: err.Error(),
+			Detail: http.StatusText(http.StatusUnprocessableEntity),
+		})
+	}
+	fmt.Printf("File url: %+v\n", filePath)
+	todo.ImageURL = filePath
+
 	err = h.insertTodoToDB(todo)
 	if err != nil {
 		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
@@ -182,7 +194,7 @@ func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 			Detail: http.StatusText(http.StatusUnprocessableEntity),
 		})
 	}
-
+	fmt.Printf("Here")
 	response.Data = todo
 	h.renderJSON(w, http.StatusCreated, response)
 }

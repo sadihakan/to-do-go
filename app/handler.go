@@ -55,10 +55,15 @@ func NewHandler(app *App) *Handler {
 //HTTP
 
 func FileServer(router *chi.Mux) {
-	root := "./src"
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	root := dir + "/src"
 	fs := http.FileServer(http.Dir(root))
 
-	router.Get("/images/*", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/files/*", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(r.RequestURI)
 		if _, err := os.Stat(root + r.RequestURI); os.IsNotExist(err) {
 			http.StripPrefix(r.RequestURI, fs).ServeHTTP(w, r)
@@ -81,7 +86,7 @@ func (h *Handler) getImagePath(r *http.Request) (string, error) {
 	fmt.Printf("File Size: %+v\n", handler.Size)
 	fmt.Printf("MIME Header: %+v\n", handler.Header)
 
-	tempFile, err := ioutil.TempFile("./src/images", "todo-*.jpg")
+	tempFile, err := ioutil.TempFile("./src/files", "todo-*.jpg")
 	if err != nil {
 		return "", err
 	}

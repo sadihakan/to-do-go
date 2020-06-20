@@ -75,13 +75,13 @@ func FileServer(router *chi.Mux) {
 	})
 }
 
-func (h *Handler) getImagePath(r *http.Request) (string, error) {
+func (h *Handler) getImagePath(todo *model.Todo, r *http.Request) error {
 	r.ParseMultipartForm(10 << 20)
 	file, handler, err := r.FormFile("image_url")
 	if err != nil {
 		fmt.Println("Error Retrieving the File")
 		fmt.Println(err)
-		return "", err
+		return err
 	}
 	defer file.Close()
 	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
@@ -90,21 +90,22 @@ func (h *Handler) getImagePath(r *http.Request) (string, error) {
 
 	tempFile, err := ioutil.TempFile("./src/files", "todo-*.jpg")
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer tempFile.Close()
 
 	fileBytes, err := ioutil.ReadAll(file)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	_, err = tempFile.Write(fileBytes)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return tempFile.Name(), nil
+	todo.ImageURL = tempFile.Name()
+	return nil
 }
 
 func (h *Handler) renderJSON(w http.ResponseWriter, statusCode int, response interface{}) {
@@ -183,7 +184,7 @@ func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath, err := h.getImagePath(r)
+	err = h.getImagePath(todo, r)
 	if err != nil {
 		h.renderJSON(w, http.StatusBadRequest, model.Response{
 			Errors: err.Error(),
@@ -191,8 +192,7 @@ func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	fmt.Printf("File url: %+v\n", filePath)
-	todo.ImageURL = filePath
+	fmt.Printf("File url: %+v\n", todo.ImageURL)
 
 	err = h.insertTodoToDB(todo)
 	if err != nil {

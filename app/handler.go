@@ -166,8 +166,11 @@ func (h *Handler) getTodosWithID(c echo.Context) error {
 func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 	response := new(model.Response)
 	todo := new(model.Todo)
+	//h, err := ioutil.ReadAll(r.Body)
 	fmt.Println(r.Body)
 	err := json.NewDecoder(r.Body).Decode(&todo)
+	fmt.Println(h)
+	err = json.NewDecoder(r.Body).Decode(&todo)
 	if err != nil {
 		h.renderJSON(w, http.StatusBadRequest, model.Response{
 			Errors: err.Error(),

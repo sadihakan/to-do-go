@@ -39,9 +39,10 @@ func NewHandler(app *App) *Handler {
 		r.Post("/", h.postTodoByChi)
 		r.Patch("/{id}", h.patchTodoByChi)
 		r.Delete("/{id}", h.deleteTodoByChi)
+		r.Post("/file", h.getImagePath)
 	})
 
-	FileServer(c)
+	h.FileServer(c)
 
 	e.GET("/", h.getTodos)
 	e.GET("/:id", h.getTodosWithID)
@@ -55,14 +56,8 @@ func NewHandler(app *App) *Handler {
 }
 //HTTP
 
-func FileServer(router *chi.Mux) {
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	filepath.Join(dir, "/src")
-	root := dir
+func (h *Handler) FileServer(router *chi.Mux) {
+	root := filepath.Join(h.App.Path, "src")
 	fs := http.FileServer(http.Dir(root))
 
 	router.Get("/files/*", func(w http.ResponseWriter, r *http.Request) {
@@ -75,37 +70,63 @@ func FileServer(router *chi.Mux) {
 	})
 }
 
-func (h *Handler) getImagePath(todo *model.Todo, r *http.Request) error {
-	r.ParseMultipartForm(10 << 20)
-	file, handler, err := r.FormFile("image_url")
+func (h *Handler) getImagePath(w http.ResponseWriter, r *http.Request) {
+	r.ParseMultipartForm(0)
+	id, err := strconv.ParseInt(r.FormValue("id"), 10,64)
 	if err != nil {
-		fmt.Println("Error Retrieving the File")
-		fmt.Println(err)
-		return err
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
+			Errors: err.Error(),
+			Detail: http.StatusText(http.StatusUnprocessableEntity),
+		})
+		return
+	}
+
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
+			Errors: err.Error(),
+			Detail: http.StatusText(http.StatusUnprocessableEntity),
+		})
+		return
 	}
 	defer file.Close()
 	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
 	fmt.Printf("File Size: %+v\n", handler.Size)
 	fmt.Printf("MIME Header: %+v\n", handler.Header)
 
-	tempFile, err := ioutil.TempFile("./src/files", "todo-*.jpg")
-	if err != nil {
-		return err
-	}
-	defer tempFile.Close()
+	tempFile, err := ioutil.TempFile("./src/files/todo", "todo-*.jpg")
 
 	fileBytes, err := ioutil.ReadAll(file)
 	if err != nil {
-		return err
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
+			Errors: err.Error(),
+			Detail: http.StatusText(http.StatusUnprocessableEntity),
+		})
+		return
 	}
 
 	_, err = tempFile.Write(fileBytes)
 	if err != nil {
-		return err
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
+			Errors: err.Error(),
+			Detail: http.StatusText(http.StatusUnprocessableEntity),
+		})
+		return
 	}
 
-	todo.ImageURL = tempFile.Name()
-	return nil
+	todo := new(model.Todo)
+	todo.ID = id
+
+	err = h.addImagePathDB(todo, tempFile.Name())
+	if err != nil {
+		h.renderJSON(w, http.StatusUnprocessableEntity, model.Response{
+			Errors: err.Error(),
+			Detail: http.StatusText(http.StatusUnprocessableEntity),
+		})
+		return
+	}
+
+	h.renderJSON(w, http.StatusOK, todo)
 }
 
 func (h *Handler) renderJSON(w http.ResponseWriter, statusCode int, response interface{}) {
@@ -166,11 +187,7 @@ func (h *Handler) getTodosWithID(c echo.Context) error {
 func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 	response := new(model.Response)
 	todo := new(model.Todo)
-	//h, err := ioutil.ReadAll(r.Body)
-	fmt.Println(r.Body)
 	err := json.NewDecoder(r.Body).Decode(&todo)
-	fmt.Println(h)
-	err = json.NewDecoder(r.Body).Decode(&todo)
 	if err != nil {
 		h.renderJSON(w, http.StatusBadRequest, model.Response{
 			Errors: err.Error(),
@@ -186,16 +203,6 @@ func (h *Handler) postTodoByChi(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	err = h.getImagePath(todo, r)
-	if err != nil {
-		h.renderJSON(w, http.StatusBadRequest, model.Response{
-			Errors: err.Error(),
-			Detail: http.StatusText(http.StatusUnprocessableEntity),
-		})
-		return
-	}
-	fmt.Printf("File url: %+v\n", todo.ImageURL)
 
 	err = h.insertTodoToDB(todo)
 	if err != nil {
@@ -381,6 +388,21 @@ func (h *Handler) deleteTodoDB(id int64) error {
 
 	_, err = tx.Exec("DELETE FROM todos WHERE id = $1", id)
 	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (h *Handler) addImagePathDB(todo *model.Todo, path string) error {
+	tx, err := h.App.DB.Beginx()
+	if err != nil {
+		return err
+	}
+
+	err = tx.QueryRowx("UPDATE todos SET image_url = $1 WHERE id = $2 RETURNING *", path, todo.ID).StructScan(todo)
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 

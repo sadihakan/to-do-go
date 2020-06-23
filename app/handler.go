@@ -10,8 +10,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 )
 
@@ -57,16 +55,11 @@ func NewHandler(app *App) *Handler {
 //HTTP
 
 func (h *Handler) FileServer(router *chi.Mux) {
-	root := filepath.Join(h.App.Path, "src")
+	root := h.App.Path
 	fs := http.FileServer(http.Dir(root))
 
-	router.Get("/files/*", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println(r.RequestURI)
-		if _, err := os.Stat(root + r.RequestURI); os.IsNotExist(err) {
-			http.StripPrefix(r.RequestURI, fs).ServeHTTP(w, r)
-		} else {
+	router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 			fs.ServeHTTP(w, r)
-		}
 	})
 }
 

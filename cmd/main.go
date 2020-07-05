@@ -1,7 +1,8 @@
 package main
 
 import (
-	"ToDoGo/app"
+	"ToDoGo/api"
+	"ToDoGo/database"
 	"log"
 	"net/http"
 	"os"
@@ -12,7 +13,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a := app.NewApp(dir)
+	db := database.Connect()
+	a := api.NewApi(dir, db)
 	//log.Fatal(a.Handler.Echo.Start(":8081"))
 	log.Fatal(http.ListenAndServe(":8081", a.Handler.Chi))
 

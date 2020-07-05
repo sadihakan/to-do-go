@@ -10,7 +10,7 @@ Simple Todo Api (using chi and sqlx)
 
 ### Installing
 
-* Install packages
+* How to install packages
 
 ```
 go mod tidy

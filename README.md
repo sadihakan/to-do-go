@@ -11,10 +11,6 @@ Simple Todo Api (using chi and sqlx)
 ### Requirements
 
 * PostgreSQL
-* Chi
-* Validator
-* Sqlx
-* UUID
 
 ### Installing
 

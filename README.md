@@ -16,6 +16,17 @@ Simple Todo Api (using chi and sqlx)
 go mod tidy
 ```
 
+* Create your .env file
+
+```
+DB_HOST=127.0.0.1
+DB_PORT=9200
+DB_NAME=Legendary
+DB_USER=TheSpecial
+DB_PASS=EverythingIsAwesome
+```
+
+
 ### Executing program
 
 * How to run the program

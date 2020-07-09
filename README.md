@@ -4,12 +4,9 @@ Simple Todo Api (using chi and sqlx)
 
 ## Getting Started
 
-### Dependencies
-
-* Go >= 1.11.x
-
 ### Requirements
 
+* Go >= 1.11.x
 * PostgreSQL
 
 ### Installing

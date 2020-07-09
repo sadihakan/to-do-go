@@ -8,6 +8,14 @@ Simple Todo Api (using chi and sqlx)
 
 * Go
 
+### Requirements
+
+* PostgreSQL
+* Chi
+* Validator
+* Sqlx
+* UUID
+
 ### Installing
 
 * How to install packages

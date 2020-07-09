@@ -83,6 +83,22 @@ func (c TodoController) Show(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	query, args, err := sqlx.In("SELECT * FROM todo_files WHERE todo_id IN (?);", todo.ID)
+	if err == nil {
+		query = c.DB.Rebind(query)
+		rows, err := c.DB.Queryx(query, args...)
+
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var tmp model.TodoFile
+				if err := rows.StructScan(&tmp); err == nil {
+					todo.Files = append(todo.Files, tmp)
+				}
+			}
+		}
+	}
+
 	c.Handler.renderJSON(w, http.StatusOK, &model.Response{
 		Data: todo,
 	})

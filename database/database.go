@@ -5,17 +5,21 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"log"
+	"github.com/joho/godotenv"
+	"os"
+	"strconv"
 )
 
-const (
-	host     = "localhost"
-	port     = 5432
-	user     = "postgres"
-	password = "sadihakan1"
-	dbname   = "learning"
+var (
+	host     = ""
+	port     = 0
+	user     = ""
+	password = ""
+	dbname   = ""
 )
 
 func Connect() *sqlx.DB {
+	setSecrets()
 	var err error
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
@@ -28,6 +32,22 @@ func Connect() *sqlx.DB {
 	db.SetMaxOpenConns(15)
 
 	return db
+}
+
+func setSecrets() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+
+	host = os.Getenv("HOST")
+	port, _ = strconv.Atoi(os.Getenv("PORT"))
+	user = os.Getenv("DB_USER")
+	password = os.Getenv("PASSWORD")
+	dbname = os.Getenv("DB_NAME")
+
+	fmt.Println(host,port,password,user,dbname)
 }
 
 

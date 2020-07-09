@@ -6,7 +6,7 @@ Simple Todo Api (using chi and sqlx)
 
 ### Dependencies
 
-* Go
+* Go >= 1.11.x
 
 ### Requirements
 

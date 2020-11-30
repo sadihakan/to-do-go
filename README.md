@@ -1,6 +1,6 @@
 # ToDoGo
 
-Simple Todo Api (using chi and sqlx) t
+Simple Todo Api (using chi and sqlx) 
 
 ## Getting Started
 
